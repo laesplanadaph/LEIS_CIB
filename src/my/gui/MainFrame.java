@@ -130,13 +130,38 @@ public class MainFrame extends javax.swing.JFrame {
                 checkInYCB.getSelectedItem() != "YYYY" &&
                 checkOutMCB.getSelectedItem() != "MM" &&
                 checkOutDCB.getSelectedItem() != "DD" &&
-                checkOutYCB.getSelectedItem() != "YYYY") {
+                checkOutYCB.getSelectedItem() != "YYYY" &&
+                validateDates()){
             return true;
         } else {
             return false;
         }
     }
     
+    private boolean validateDates() {
+        int checkInM = Integer.parseInt((String) checkInMCB.getSelectedItem());
+        int checkInD = Integer.parseInt((String) checkInDCB.getSelectedItem());
+        int checkInY = Integer.parseInt((String) checkInYCB.getSelectedItem());
+        int checkOutM = Integer.parseInt((String) checkOutMCB.getSelectedItem());
+        int checkOutD = Integer.parseInt((String) checkOutDCB.getSelectedItem());
+        int checkOutY = Integer.parseInt((String) checkOutYCB.getSelectedItem());
+        
+        boolean result = false;
+
+        if (checkOutY == checkInY){
+            if (checkOutM == checkInM) {
+                if (checkOutD > checkInD) {
+                    result = true;
+                }
+            } else if (checkOutM > checkInM) {
+                result = true;
+            }
+        } else if (checkOutY > checkInY) {
+            result = true;
+        }
+        
+        return result;
+    }
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -510,7 +535,7 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_exitBtnActionPerformed
 
     private void addBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addBtnActionPerformed
-        
+ 
         String checkIn = checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem() +"-"+ checkInYCB.getSelectedItem();
         String checkOut = checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem() +"-"+ checkOutYCB.getSelectedItem();
         
@@ -526,6 +551,7 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_formWindowOpened
 
     private void deleteBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteBtnActionPerformed
+      
         int decision = JOptionPane.showConfirmDialog(null, 
                                   "All selected rows will be deleted permanently, are you sure?", 
                                   "Confirm Delete", 

@@ -5,15 +5,15 @@
  */
 package my.gui;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
 import javax.swing.JOptionPane;
 import javax.swing.table.DefaultTableModel;
@@ -23,26 +23,27 @@ import javax.swing.table.DefaultTableModel;
  * @author gene chester
  */
 public class MainFrame extends javax.swing.JFrame {
-
-    /**
-     * Creates new form LEIS
-     */
     
-    Calendar cal = Calendar.getInstance();
     DefaultTableModel tableModel;
-    
-    ArrayList<String> currentTable = new ArrayList<String>();
     
     public MainFrame() {
         initComponents();
-        
-        tableModel = (DefaultTableModel) schedTable.getModel(); 
-        
-        preloadComboBox();
-        
-        deleteBtn.setEnabled(false);
-        editBtn.setEnabled(false);
-        addBtn.setEnabled(false);
+    }
+    
+    private Connection getConnection() {
+        try {
+            Connection conn = null;
+            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/leis","root","k3k4mj33");
+            
+            if(conn != null) {
+                System.out.println("successfully connected to db!");
+            }
+            
+            return conn;
+        } catch (Exception e) {
+            System.out.println(e);
+            return null;
+        }
     }
     
     private void preloadComboBox() {
@@ -82,7 +83,7 @@ public class MainFrame extends javax.swing.JFrame {
         
     }
     
-    private void saveTable(){
+/**    private void saveTable(){
         try {
             PrintWriter writer = new PrintWriter("test.txt","UTF-8");
             
@@ -95,30 +96,71 @@ public class MainFrame extends javax.swing.JFrame {
             System.out.println(e);
         }
     }
+ */
     
-    private void refreshTable(){
+    private ArrayList<Reservation> getReservationList() {
+        
+        ArrayList<Reservation> reservationList = new ArrayList<Reservation>();
+            
+        Connection conn = getConnection();
+
+        String query = "SELECT * FROM `reservation`";
+        Statement st;
+        ResultSet rs;
+
         try {
-            
-            tableModel.setRowCount(0);
-            
-            if (new File("test.txt").exists()){
-                
-                BufferedReader reader = new BufferedReader(new FileReader("test.txt"));
-                boolean isCurrentTableEmpty = currentTable.isEmpty();
-                String line = null;
-                while((line = reader.readLine()) != null) {
-                    String[] split = line.split("\t");
-                    if (isCurrentTableEmpty) {
-                        currentTable.add(line);
-                    }
-                    tableModel.insertRow(tableModel.getRowCount(), new Object[]{split[0],split[1],split[2],split[3]});
-                }
-                reader.close();
-                deleteBtn.setEnabled(false);
-                editBtn.setEnabled(false);
+            st = conn.createStatement();
+            rs = st.executeQuery(query);
+
+            Reservation reservation;
+
+            while(rs.next()){
+                reservation = new Reservation(rs.getInt("reservation_id"),rs.getString("name"),rs.getInt("room"),rs.getString("check_in"),rs.getString("check_out"),rs.getString("date_added"));
+                reservationList.add(reservation);
             }
-        } catch (IOException e) {
-            System.out.println(e);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+            return reservationList;
+    }
+    
+    private void displayReservationList(){
+        try {
+            ArrayList<Reservation> list= getReservationList();
+            
+            tableModel = (DefaultTableModel) schedTable.getModel(); 
+            
+            Object[] row = new Object[6];
+            
+            for (int i = 0; i < list.size(); i++) {
+                row[0] = list.get(i).getId();
+                row[1] = list.get(i).getName();
+                row[2] = list.get(i).getRoomNo();
+                row[3] = list.get(i).getCheckIn();
+                row[4] = list.get(i).getCheckOut();
+                row[5] = list.get(i).getDateAdded();
+                
+                tableModel.addRow(row);
+            }
+            
+//            if (new File("test.txt").exists()){
+//                
+//                BufferedReader reader = new BufferedReader(new FileReader("test.txt"));
+//                boolean isCurrentTableEmpty = currentTable.isEmpty();
+//                String line = null;
+//                while((line = reader.readLine()) != null) {
+//                    String[] split = line.split("\t");
+//                    if (isCurrentTableEmpty) {
+//                        currentTable.add(line);
+//                    }
+//                    tableModel.insertRow(tableModel.getRowCount(), new Object[]{split[0],split[1],split[2],split[3]});
+//                }
+//                reader.close();
+//                deleteBtn.setEnabled(false);
+//                editBtn.setEnabled(false);
+//            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }  
     }
     
@@ -162,12 +204,43 @@ public class MainFrame extends javax.swing.JFrame {
         
         return result;
     }
+    
+    private Reservation getForm() {
+        DateFormat dateAddedFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Date date = new Date();
+   
+        String name = nameTF.getText();
+        int roomNo = Integer.parseInt((String) roomNoCB.getSelectedItem());
+        String checkIn = checkInYCB.getSelectedItem() +"-"+ checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem();
+        String checkOut = checkOutYCB.getSelectedItem() +"-"+ checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem();
+        String dateTime = dateAddedFormat.format(date);
+        
+        Reservation reservation = new Reservation(name,roomNo,checkIn,checkOut, dateTime);
+        
+        return reservation;
+    }
 
-    /**
-     * This method is called from within the constructor to initialize the form.
-     * WARNING: Do NOT modify this code. The content of this method is always
-     * regenerated by the Form Editor.
-     */
+    private void insertData(Reservation r) {
+        Connection conn = getConnection();
+
+        String query = "INSERT INTO `reservation` VALUES (null,'"+
+                r.getName() +"','"+
+                r.getRoomNo() +"','"+
+                r.getCheckIn() +"','"+
+                r.getCheckOut() +"','"+
+                r.getDateAdded() +"')";
+        Statement st;
+        int rs;
+
+        try {
+            st = conn.createStatement();
+            rs = st.executeUpdate(query);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -243,11 +316,11 @@ public class MainFrame extends javax.swing.JFrame {
 
             },
             new String [] {
-                "Name", "Room #", "Check-in Date", "Check-out Date"
+                "Reservation ID", "Name", "Room #", "Check-in Date", "Check-out Date", "Date Added"
             }
         ) {
             boolean[] canEdit = new boolean [] {
-                false, false, false, false
+                true, false, false, false, false, true
             };
 
             public boolean isCellEditable(int rowIndex, int columnIndex) {
@@ -535,19 +608,17 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_exitBtnActionPerformed
 
     private void addBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addBtnActionPerformed
- 
-        String checkIn = checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem() +"-"+ checkInYCB.getSelectedItem();
-        String checkOut = checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem() +"-"+ checkOutYCB.getSelectedItem();
-        
-        currentTable.add(nameTF.getText() + "\t" + roomNoCB.getSelectedItem() + "\t" + checkIn + "\t" + checkOut);
-
-        saveTable();
-        refreshTable();
-
+        insertData(getForm());
+        tableModel.setRowCount(0);
+        displayReservationList();
     }//GEN-LAST:event_addBtnActionPerformed
 
     private void formWindowOpened(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowOpened
-        refreshTable();
+        displayReservationList();
+        preloadComboBox();
+        deleteBtn.setEnabled(false);
+        editBtn.setEnabled(false);
+        addBtn.setEnabled(false);
     }//GEN-LAST:event_formWindowOpened
 
     private void deleteBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteBtnActionPerformed

@@ -5,8 +5,6 @@
  */
 package my.gui;
 
-import java.io.IOException;
-import java.io.PrintWriter;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -79,24 +77,7 @@ public class MainFrame extends javax.swing.JFrame {
             checkOutYCB.addItem(Integer.toString(i));
         }
         
-        
-        
     }
-    
-/**    private void saveTable(){
-        try {
-            PrintWriter writer = new PrintWriter("test.txt","UTF-8");
-            
-            for(String line : currentTable) {
-                writer.println(line);
-            }
-            
-            writer.close();
-        } catch (IOException e) {
-            System.out.println(e);
-        }
-    }
- */
     
     private ArrayList<Reservation> getReservationList() {
         
@@ -130,35 +111,24 @@ public class MainFrame extends javax.swing.JFrame {
             
             tableModel = (DefaultTableModel) schedTable.getModel(); 
             
+            DateFormat dateAddedFormat = new SimpleDateFormat("MM-dd-yyyy hh:mm a");
+            DateFormat checkInOutFormat = new SimpleDateFormat("MM-dd-yyyy");
+            DateFormat dateAddedParse = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            DateFormat checkInOutParse = new SimpleDateFormat("yyyy-MM-dd");
+            
             Object[] row = new Object[6];
             
             for (int i = 0; i < list.size(); i++) {
-                row[0] = list.get(i).getId();
+                row[0] = String.format("%06d", list.get(i).getId());
                 row[1] = list.get(i).getName();
                 row[2] = list.get(i).getRoomNo();
-                row[3] = list.get(i).getCheckIn();
-                row[4] = list.get(i).getCheckOut();
-                row[5] = list.get(i).getDateAdded();
+                row[3] = checkInOutFormat.format(checkInOutParse.parse(list.get(i).getCheckIn()));
+                row[4] = checkInOutFormat.format(checkInOutParse.parse(list.get(i).getCheckOut()));
+                row[5] = dateAddedFormat.format(dateAddedParse.parse(list.get(i).getDateAdded()));
                 
                 tableModel.addRow(row);
             }
-            
-//            if (new File("test.txt").exists()){
-//                
-//                BufferedReader reader = new BufferedReader(new FileReader("test.txt"));
-//                boolean isCurrentTableEmpty = currentTable.isEmpty();
-//                String line = null;
-//                while((line = reader.readLine()) != null) {
-//                    String[] split = line.split("\t");
-//                    if (isCurrentTableEmpty) {
-//                        currentTable.add(line);
-//                    }
-//                    tableModel.insertRow(tableModel.getRowCount(), new Object[]{split[0],split[1],split[2],split[3]});
-//                }
-//                reader.close();
-//                deleteBtn.setEnabled(false);
-//                editBtn.setEnabled(false);
-//            }
+
         } catch (Exception e) {
             e.printStackTrace();
         }  
@@ -223,7 +193,7 @@ public class MainFrame extends javax.swing.JFrame {
     private void insertData(Reservation r) {
         Connection conn = getConnection();
 
-        String query = "INSERT INTO `reservation` VALUES (null,'"+
+        String query = "INSERT INTO reservation (name,room,check_in,check_out,date_added) VALUES ('"+
                 r.getName() +"','"+
                 r.getRoomNo() +"','"+
                 r.getCheckIn() +"','"+
@@ -239,6 +209,44 @@ public class MainFrame extends javax.swing.JFrame {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+    
+    private void deleteData(int id) {
+        Connection conn = getConnection();
+        
+        String query = "DELETE FROM `reservation` WHERE reservation_id='"+id+"'";
+        Statement st;
+        int rs;
+
+        try {
+            st = conn.createStatement();
+            rs = st.executeUpdate(query);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    private void setForm(int index) {
+        
+        String id = schedTable.getValueAt(index,0).toString();
+        String name = schedTable.getValueAt(index,1).toString();
+        String roomNo = schedTable.getValueAt(index,2).toString();
+        String checkIn = schedTable.getValueAt(index,3).toString();
+        String checkOut = schedTable.getValueAt(index,4).toString();
+        
+        idTF.setText(id);
+        nameTF.setText(name);
+        roomNoCB.setSelectedItem(roomNo);
+        
+        String[] cI = checkIn.split("-");
+        checkInMCB.setSelectedItem(cI[0].replaceFirst("^0+(?!$)",""));
+        checkInDCB.setSelectedItem(cI[1].replaceFirst("^0+(?!$)",""));
+        checkInYCB.setSelectedItem(cI[2]);
+        
+        String[] cO = checkOut.split("-");
+        checkOutMCB.setSelectedItem(cO[0].replaceFirst("^0+(?!$)",""));
+        checkOutDCB.setSelectedItem(cO[1].replaceFirst("^0+(?!$)",""));
+        checkOutYCB.setSelectedItem(cO[2]);
     }
     
     @SuppressWarnings("unchecked")
@@ -271,10 +279,14 @@ public class MainFrame extends javax.swing.JFrame {
         checkOutDCB = new javax.swing.JComboBox<>();
         checkInYCB = new javax.swing.JComboBox<>();
         checkOutYCB = new javax.swing.JComboBox<>();
+        idTF = new javax.swing.JTextField();
+        jLabel5 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setMinimumSize(new java.awt.Dimension(950, 380));
+        setMaximumSize(new java.awt.Dimension(1275, 500));
+        setMinimumSize(new java.awt.Dimension(1275, 500));
         setPreferredSize(new java.awt.Dimension(1023, 600));
+        setResizable(false);
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowOpened(java.awt.event.WindowEvent evt) {
                 formWindowOpened(evt);
@@ -316,12 +328,19 @@ public class MainFrame extends javax.swing.JFrame {
 
             },
             new String [] {
-                "Reservation ID", "Name", "Room #", "Check-in Date", "Check-out Date", "Date Added"
+                "ID No.", "Name", "Room No.", "Check-in Date", "Check-out Date", "Date Added"
             }
         ) {
-            boolean[] canEdit = new boolean [] {
-                true, false, false, false, false, true
+            Class[] types = new Class [] {
+                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
             };
+            boolean[] canEdit = new boolean [] {
+                false, false, false, false, false, false
+            };
+
+            public Class getColumnClass(int columnIndex) {
+                return types [columnIndex];
+            }
 
             public boolean isCellEditable(int rowIndex, int columnIndex) {
                 return canEdit [columnIndex];
@@ -342,14 +361,22 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
         jScrollPane1.setViewportView(schedTable);
+        if (schedTable.getColumnModel().getColumnCount() > 0) {
+            schedTable.getColumnModel().getColumn(0).setResizable(false);
+            schedTable.getColumnModel().getColumn(1).setResizable(false);
+            schedTable.getColumnModel().getColumn(2).setResizable(false);
+            schedTable.getColumnModel().getColumn(3).setResizable(false);
+            schedTable.getColumnModel().getColumn(4).setResizable(false);
+            schedTable.getColumnModel().getColumn(5).setResizable(false);
+        }
 
-        jLabel1.setText("Name");
+        jLabel1.setText("Name:");
 
-        jLabel2.setText("Room #");
+        jLabel2.setText("Room #:");
 
-        jLabel3.setText("Check-in Date");
+        jLabel3.setText("Check-in Date:");
 
-        jLabel4.setText("Check-out Date");
+        jLabel4.setText("Check-out Date:");
 
         nameTF.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyReleased(java.awt.event.KeyEvent evt) {
@@ -460,6 +487,8 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
 
+        jLabel5.setText("ID:");
+
         javax.swing.GroupLayout table_panelLayout = new javax.swing.GroupLayout(table_panel);
         table_panel.setLayout(table_panelLayout);
         table_panelLayout.setHorizontalGroup(
@@ -468,19 +497,18 @@ public class MainFrame extends javax.swing.JFrame {
                 .addContainerGap()
                 .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(table_panelLayout.createSequentialGroup()
-                        .addComponent(statusLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(statusLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 1213, Short.MAX_VALUE)
                         .addContainerGap())
                     .addGroup(table_panelLayout.createSequentialGroup()
-                        .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 630, Short.MAX_VALUE)
-                        .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 848, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(18, 18, 18)
+                        .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addGroup(table_panelLayout.createSequentialGroup()
-                                .addGap(12, 12, 12)
                                 .addComponent(deselectBtn)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addComponent(exitBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 96, javax.swing.GroupLayout.PREFERRED_SIZE))
                             .addGroup(table_panelLayout.createSequentialGroup()
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 34, Short.MAX_VALUE)
-                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
                                         .addComponent(jLabel1)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -494,29 +522,35 @@ public class MainFrame extends javax.swing.JFrame {
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                                 .addComponent(clearBtn))
                                             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
-                                                .addComponent(nameTF, javax.swing.GroupLayout.PREFERRED_SIZE, 176, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addGap(10, 10, 10)
-                                                .addComponent(jLabel2)
+                                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                                                    .addGroup(table_panelLayout.createSequentialGroup()
+                                                        .addComponent(nameTF, javax.swing.GroupLayout.PREFERRED_SIZE, 176, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                        .addGap(10, 10, 10)
+                                                        .addComponent(jLabel2))
+                                                    .addComponent(jLabel5))
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                .addComponent(roomNoCB, javax.swing.GroupLayout.PREFERRED_SIZE, 58, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                                    .addComponent(roomNoCB, 0, 58, Short.MAX_VALUE)
+                                                    .addComponent(idTF)))))
                                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
                                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                                             .addGroup(table_panelLayout.createSequentialGroup()
                                                 .addComponent(jLabel3)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                                 .addComponent(checkInMCB, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                                 .addComponent(jLabel7))
                                             .addGroup(table_panelLayout.createSequentialGroup()
+                                                .addGap(0, 0, Short.MAX_VALUE)
                                                 .addComponent(jLabel4)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                                 .addComponent(checkOutMCB, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                                 .addComponent(jLabel8)))
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                            .addComponent(checkOutDCB, 0, 56, Short.MAX_VALUE)
-                                            .addComponent(checkInDCB, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                            .addComponent(checkOutDCB, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                            .addComponent(checkInDCB, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                             .addGroup(table_panelLayout.createSequentialGroup()
@@ -527,7 +561,8 @@ public class MainFrame extends javax.swing.JFrame {
                                                 .addComponent(jLabel9)
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                                 .addComponent(checkInYCB, javax.swing.GroupLayout.PREFERRED_SIZE, 71, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                                        .addGap(34, 34, 34))))))))
+                                        .addGap(34, 34, 34)))
+                                .addContainerGap())))))
         );
         table_panelLayout.setVerticalGroup(
             table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -536,6 +571,10 @@ public class MainFrame extends javax.swing.JFrame {
                 .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 382, Short.MAX_VALUE)
                     .addGroup(table_panelLayout.createSequentialGroup()
+                        .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(idTF, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel5))
+                        .addGap(18, 18, 18)
                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(nameTF, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(jLabel1)
@@ -565,20 +604,18 @@ public class MainFrame extends javax.swing.JFrame {
                                     .addComponent(checkOutYCB, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
                         .addGap(32, 32, 32)
                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(table_panelLayout.createSequentialGroup()
-                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(clearBtn)
-                                    .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(deleteBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(editBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(addBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(clearBtn)
+                            .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                .addComponent(deleteBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(editBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(addBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
                                 .addComponent(statusLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 18, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addGap(29, 29, 29)
                                 .addComponent(exitBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 37, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
-                                .addGap(0, 0, Short.MAX_VALUE)
-                                .addComponent(deselectBtn)))))
+                            .addComponent(deselectBtn, javax.swing.GroupLayout.Alignment.TRAILING))))
                 .addContainerGap())
         );
 
@@ -614,11 +651,19 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_addBtnActionPerformed
 
     private void formWindowOpened(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowOpened
+
         displayReservationList();
         preloadComboBox();
+        idTF.setEnabled(false);
         deleteBtn.setEnabled(false);
         editBtn.setEnabled(false);
         addBtn.setEnabled(false);
+        schedTable.getColumnModel().getColumn(0).setPreferredWidth(30);
+        schedTable.getColumnModel().getColumn(1).setPreferredWidth(150);
+        schedTable.getColumnModel().getColumn(2).setPreferredWidth(0);
+        schedTable.getColumnModel().getColumn(3).setPreferredWidth(30);
+        schedTable.getColumnModel().getColumn(4).setPreferredWidth(30);
+        schedTable.getColumnModel().getColumn(5).setPreferredWidth(80);
     }//GEN-LAST:event_formWindowOpened
 
     private void deleteBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteBtnActionPerformed
@@ -632,12 +677,13 @@ public class MainFrame extends javax.swing.JFrame {
         
             int[] selectedRows = schedTable.getSelectedRows();
 
-            for (int row = selectedRows.length-1; row >= 0; row--){
-                currentTable.remove(selectedRows[row]);
+            for (int i=selectedRows.length-1 ; i >= 0 ; i--) {
+                deleteData(Integer.parseInt(tableModel.getValueAt(selectedRows[i],0).toString()));
             }
 
-            saveTable();
-            refreshTable();
+            tableModel.setRowCount(0);
+            displayReservationList();
+            
         }
         
     }//GEN-LAST:event_deleteBtnActionPerformed
@@ -664,27 +710,8 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_editBtnActionPerformed
 
     private void schedTableMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_schedTableMouseClicked
-        String rowData = currentTable.get(schedTable.getSelectedRow());
-        String[] data = rowData.split("\t");
-        
-        nameTF.setText(data[0]);
-        
-        roomNoCB.setSelectedItem(data[1]);
-        
-        String[] checkIn = data[2].split("-");
-        checkInMCB.setSelectedItem(checkIn[0]);
-        checkInDCB.setSelectedItem(checkIn[1]);
-        checkInYCB.setSelectedItem(checkIn[2]);
-
-        String[] checkOut = data[3].split("-");
-        checkOutMCB.setSelectedItem(checkOut[0]);
-        checkOutDCB.setSelectedItem(checkOut[1]);
-        checkOutYCB.setSelectedItem(checkOut[2]);
-        
-        
-//        checkInYTF.setText(data[2]);
-//        checkOutYTF.setText(data[3]);
-        
+//        setForm(Integer.parseInt(tableModel.getValueAt(schedTable.getSelectedRow(),0).toString()));
+        setForm(schedTable.getSelectedRow());
     }//GEN-LAST:event_schedTableMouseClicked
 
     private void mouseEditDeleteButtonControl(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_mouseEditDeleteButtonControl
@@ -714,22 +741,22 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_keyboardEditDeleteButtonControl
 
     private void schedTableKeyboardReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_schedTableKeyboardReleased
-        String rowData = currentTable.get(schedTable.getSelectedRow());
-        String[] data = rowData.split("\t");
-        
-        nameTF.setText(data[0]);
-        
-        roomNoCB.setSelectedItem(data[1]);
-        
-        String[] checkIn = data[2].split("-");
-        checkInMCB.setSelectedItem(checkIn[0]);
-        checkInDCB.setSelectedItem(checkIn[1]);
-        checkInYCB.setSelectedItem(checkIn[2]);
-
-        String[] checkOut = data[3].split("-");
-        checkOutMCB.setSelectedItem(checkOut[0]);
-        checkOutDCB.setSelectedItem(checkOut[1]);
-        checkOutYCB.setSelectedItem(checkOut[2]);
+//        String rowData = currentTable.get(schedTable.getSelectedRow());
+//        String[] data = rowData.split("\t");
+//        
+//        nameTF.setText(data[0]);
+//        
+//        roomNoCB.setSelectedItem(data[1]);
+//        
+//        String[] checkIn = data[2].split("-");
+//        checkInMCB.setSelectedItem(checkIn[0]);
+//        checkInDCB.setSelectedItem(checkIn[1]);
+//        checkInYCB.setSelectedItem(checkIn[2]);
+//
+//        String[] checkOut = data[3].split("-");
+//        checkOutMCB.setSelectedItem(checkOut[0]);
+//        checkOutDCB.setSelectedItem(checkOut[1]);
+//        checkOutYCB.setSelectedItem(checkOut[2]);
     }//GEN-LAST:event_schedTableKeyboardReleased
 
     private void clearBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearBtnActionPerformed
@@ -926,11 +953,13 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.JButton deselectBtn;
     private javax.swing.JButton editBtn;
     private javax.swing.JButton exitBtn;
+    private javax.swing.JTextField idTF;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
     private javax.swing.JLabel jLabel9;

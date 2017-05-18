@@ -179,13 +179,14 @@ public class MainFrame extends javax.swing.JFrame {
         DateFormat dateAddedFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         Date date = new Date();
    
+        int id = Integer.parseInt((String) idTF.getText());
         String name = nameTF.getText();
         int roomNo = Integer.parseInt((String) roomNoCB.getSelectedItem());
         String checkIn = checkInYCB.getSelectedItem() +"-"+ checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem();
         String checkOut = checkOutYCB.getSelectedItem() +"-"+ checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem();
         String dateTime = dateAddedFormat.format(date);
         
-        Reservation reservation = new Reservation(name,roomNo,checkIn,checkOut, dateTime);
+        Reservation reservation = new Reservation(id,name,roomNo,checkIn,checkOut,dateTime);
         
         return reservation;
     }
@@ -197,8 +198,7 @@ public class MainFrame extends javax.swing.JFrame {
                 r.getName() +"','"+
                 r.getRoomNo() +"','"+
                 r.getCheckIn() +"','"+
-                r.getCheckOut() +"','"+
-                r.getDateAdded() +"')";
+                r.getCheckOut() +"')";
         Statement st;
         int rs;
 
@@ -226,6 +226,29 @@ public class MainFrame extends javax.swing.JFrame {
             e.printStackTrace();
         }
     }
+    
+    private void updateData(Reservation r){
+        Connection conn = getConnection();
+
+        String query = "UPDATE reservation "
+                + "SET name='"+r.getName() 
+                +"',room='"+r.getRoomNo() 
+                +"',check_in'"+ r.getCheckIn() 
+                +"',check_out'"+ r.getCheckOut() 
+                +"',date_added='"+r.getDateAdded() 
+                +"' WHERE reservation_id='"+r.getId()+"'";
+        Statement st;
+        int rs;
+
+        try {
+            st = conn.createStatement();
+            rs = st.executeUpdate(query);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
     private void setForm(int index) {
         
         String id = schedTable.getValueAt(index,0).toString();
@@ -690,6 +713,9 @@ public class MainFrame extends javax.swing.JFrame {
     
     private void editBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_editBtnActionPerformed
         
+        
+        
+        
         int decision = JOptionPane.showConfirmDialog(null, 
                                   "The selected row will be overwritten, are you sure?", 
                                   "Confirm Edit", 
@@ -697,20 +723,17 @@ public class MainFrame extends javax.swing.JFrame {
         
         if (decision == JOptionPane.YES_OPTION) {
         
-        String checkIn = checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem() +"-"+ checkInYCB.getSelectedItem();
-        String checkOut = checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem() +"-"+ checkOutYCB.getSelectedItem();
-        
-        currentTable.set(schedTable.getSelectedRow(), nameTF.getText() + "\t" + roomNoCB.getSelectedItem() + "\t" + checkIn + "\t" + checkOut);
-
-        saveTable();
-        refreshTable();
-        
+            
+            updateData(getForm());
+            tableModel.setRowCount(0);
+            displayReservationList();
+ 
         }
+
         
     }//GEN-LAST:event_editBtnActionPerformed
 
     private void schedTableMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_schedTableMouseClicked
-//        setForm(Integer.parseInt(tableModel.getValueAt(schedTable.getSelectedRow(),0).toString()));
         setForm(schedTable.getSelectedRow());
     }//GEN-LAST:event_schedTableMouseClicked
 

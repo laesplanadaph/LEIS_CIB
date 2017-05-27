@@ -86,7 +86,7 @@ public class MainFrame extends javax.swing.JFrame {
             
         Connection conn = getConnection();
 
-        String query = "SELECT * FROM `reservation`";
+        String query = "SELECT * FROM reservation";
         Statement st;
         ResultSet rs;
 
@@ -144,7 +144,7 @@ public class MainFrame extends javax.swing.JFrame {
                 checkOutMCB.getSelectedItem() != "MM" &&
                 checkOutDCB.getSelectedItem() != "DD" &&
                 checkOutYCB.getSelectedItem() != "YYYY" &&
-                validateDates()){
+                validateDates() && dateConflictChecker()){
             return true;
         } else {
             return false;
@@ -176,18 +176,153 @@ public class MainFrame extends javax.swing.JFrame {
         return result;
     }
     
+    private boolean dateConflictChecker() {
+        boolean result = true;
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+
+            String checkInForm = checkInYCB.getSelectedItem() +"-"+ checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem();
+            String checkOutForm = checkOutYCB.getSelectedItem() +"-"+ checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem();
+            Date checkInDateForm = sdf.parse(checkInForm);
+            Date checkOutDateForm = sdf.parse(checkOutForm);
+            
+            ArrayList<Reservation> dates = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()),Integer.parseInt(idTF.getText()));
+        
+            if(dates.isEmpty()) {
+                return result;
+            }
+            
+            for (int i = 0; i < dates.size(); i++) {
+                int id = dates.get(i).getId();
+                String checkIn = dates.get(i).getCheckIn();
+                String checkOut = dates.get(i).getCheckOut();
+                Date checkInDate = sdf.parse(checkIn);
+                Date checkOutDate = sdf.parse(checkOut);
+
+//                if (checkInDateForm.equals(checkInDate)) {
+//                    result = false;
+//                    break;
+//                }
+
+                if (checkInDateForm.compareTo(checkInDate) * checkOutDateForm.compareTo(checkOutDate) == 0 ||
+                    (checkInDateForm.compareTo(checkInDate) < 0 && checkInDate.compareTo(checkOutDateForm) < 0) ||
+                    (checkInDateForm.compareTo(checkInDate) > 0 && checkOutDate.compareTo(checkInDateForm) > 0)) {
+                    
+                    result = false;
+                    break;
+                    
+                }
+                
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        return result;
+    }
+    
+    private ArrayList<Reservation> getDates(int room, int id){ //reservation_id currently not used (check for what it's conflicting with)
+        Reservation dates;
+        ArrayList<Reservation> dateList = new ArrayList<Reservation>();
+        
+        
+        Connection conn = getConnection();
+        
+        String query = "SELECT reservation_id,check_in,check_out FROM reservation WHERE room='"+room+"' AND reservation_id <> '"+id+"'";
+        Statement st;
+        ResultSet rs;
+
+        try {
+            st = conn.createStatement();
+            rs = st.executeQuery(query);
+            
+            while(rs.next()) {
+                dates = new Reservation(rs.getInt("reservation_id"),rs.getString("check_in"),rs.getString("check_out"));
+                dateList.add(dates);
+            }
+            
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        return dateList;
+    }
+    
+    private void dateValidation(String str) {
+        String[] thirtyOne = {"MM","1","3","5","7","8","10","12"};
+        String[] thirty = {"4","6","9","11"};
+        
+        JComboBox<String> d = new JComboBox<String>();
+        JComboBox<String> m = new JComboBox<String>();
+        JComboBox<String> y = new JComboBox<String>();
+        
+        if ("in".equals(str)){
+            d = checkInDCB;
+            m = checkInMCB;
+            y = checkInYCB;            
+        } else if ("out".equals(str)){
+            d = checkOutDCB;
+            m = checkOutMCB;
+            y = checkOutYCB; 
+        }  
+        
+        Object temp = d.getSelectedItem();
+        
+        if (m.getSelectedItem().equals("2")) {
+            d.removeAllItems();
+            d.addItem("DD");
+            int feb = 29;
+            
+            if (y.getSelectedItem() != "YYYY") {
+                if ( ( (Integer.parseInt( (String) y.getSelectedItem())) % 4 ) != 0) {
+                    feb--;
+                }
+            }
+            for (int i = 1 ; i <= feb ; i++) {
+                    d.addItem(Integer.toString(i));
+            }
+        } else {
+            d.removeAllItems();
+            d.addItem("DD");
+            for (String s : thirtyOne) {
+                if (m.getSelectedItem().equals(s)){
+                    for (int i = 1 ; i <= 31 ; i++) {
+                        d.addItem(Integer.toString(i));
+                    }
+                    break;
+                }
+            }
+            for (String s : thirty) {
+                if (m.getSelectedItem().equals(s)) {
+                    for (int i = 1 ; i <= 30 ; i++) {
+                        d.addItem(Integer.toString(i));
+                    }
+                    break;
+                }
+            }
+        }
+        d.setSelectedItem(temp);
+    }
+    
     private Reservation getForm() {
         DateFormat dateAddedFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         Date date = new Date();
    
-        int id = Integer.parseInt((String) idTF.getText());
+        Reservation reservation;
+                
+        int id;
+        String idStr = (String) idTF.getText();
         String name = nameTF.getText();
         int roomNo = Integer.parseInt((String) roomNoCB.getSelectedItem());
         String checkIn = checkInYCB.getSelectedItem() +"-"+ checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem();
         String checkOut = checkOutYCB.getSelectedItem() +"-"+ checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem();
         String dateTime = dateAddedFormat.format(date);
-        
-        Reservation reservation = new Reservation(id,name,roomNo,checkIn,checkOut,dateTime);
+        if (!idStr.equals("")) {
+            id = Integer.parseInt(idStr);
+            reservation = new Reservation(id,name,roomNo,checkIn,checkOut,dateTime);
+        }
+        reservation = new Reservation(name,roomNo,checkIn,checkOut,dateTime);
         
         return reservation;
     }
@@ -252,7 +387,7 @@ public class MainFrame extends javax.swing.JFrame {
     private void deleteData(int id) {
         Connection conn = getConnection();
         
-        String query = "DELETE FROM `reservation` WHERE reservation_id='"+id+"'";
+        String query = "DELETE FROM reservation WHERE reservation_id='"+id+"'";
         Statement st;
         int rs;
 
@@ -309,62 +444,6 @@ public class MainFrame extends javax.swing.JFrame {
             addBtn.setEnabled(false);
             editBtn.setEnabled(false);
         }
-    }
-    
-    private void dateValidation(String str) {
-        String[] thirtyOne = {"MM","1","3","5","7","8","10","12"};
-        String[] thirty = {"4","6","9","11"};
-        
-        JComboBox<String> d = new JComboBox<String>();
-        JComboBox<String> m = new JComboBox<String>();
-        JComboBox<String> y = new JComboBox<String>();
-        
-        if ("in".equals(str)){
-            d = checkInDCB;
-            m = checkInMCB;
-            y = checkInYCB;            
-        } else if ("out".equals(str)){
-            d = checkOutDCB;
-            m = checkOutMCB;
-            y = checkOutYCB; 
-        }  
-        
-        Object temp = d.getSelectedItem();
-        
-        if (m.getSelectedItem().equals("2")) {
-            d.removeAllItems();
-            d.addItem("DD");
-            int feb = 29;
-            
-            if (y.getSelectedItem() != "YYYY") {
-                if ( ( (Integer.parseInt( (String) y.getSelectedItem())) % 4 ) != 0) {
-                    feb--;
-                }
-            }
-            for (int i = 1 ; i <= feb ; i++) {
-                    d.addItem(Integer.toString(i));
-            }
-        } else {
-            d.removeAllItems();
-            d.addItem("DD");
-            for (String s : thirtyOne) {
-                if (m.getSelectedItem().equals(s)){
-                    for (int i = 1 ; i <= 31 ; i++) {
-                        d.addItem(Integer.toString(i));
-                    }
-                    break;
-                }
-            }
-            for (String s : thirty) {
-                if (m.getSelectedItem().equals(s)) {
-                    for (int i = 1 ; i <= 30 ; i++) {
-                        d.addItem(Integer.toString(i));
-                    }
-                    break;
-                }
-            }
-        }
-        d.setSelectedItem(temp);
     }
     
     @SuppressWarnings("unchecked")
@@ -766,6 +845,7 @@ public class MainFrame extends javax.swing.JFrame {
         insertData(getForm());
         tableModel.setRowCount(0);
         displayReservationList();
+        idTF.setText(null);
     }//GEN-LAST:event_addBtnActionPerformed
 
     private void formWindowOpened(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowOpened
@@ -801,14 +881,14 @@ public class MainFrame extends javax.swing.JFrame {
             tableModel.setRowCount(0);
             displayReservationList();
             
+            buttonControlAddEdit();
+            buttonControlEditDelete();
+            idTF.setText(null);
         }
         
     }//GEN-LAST:event_deleteBtnActionPerformed
     
     private void editBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_editBtnActionPerformed
-        
-        
-        
         
         int decision = JOptionPane.showConfirmDialog(null, 
                                   "The selected row will be overwritten, are you sure?", 
@@ -821,7 +901,7 @@ public class MainFrame extends javax.swing.JFrame {
             updateData(getForm());
             tableModel.setRowCount(0);
             displayReservationList();
- 
+            idTF.setText(null);
         }
 
         
@@ -864,15 +944,7 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_clearBtnActionPerformed
 
     private void keyboardAddEditButtonControl(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_keyboardAddEditButtonControl
-        if (validateForm()) {
-            addBtn.setEnabled(true);
-            if (schedTable.getSelectedRowCount() == 1){
-                editBtn.setEnabled(true);
-            }
-        } else {
-            addBtn.setEnabled(false);
-            editBtn.setEnabled(false);
-        }
+        buttonControlAddEdit();
     }//GEN-LAST:event_keyboardAddEditButtonControl
 
     private void mouseAddEditButtonControl(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_mouseAddEditButtonControl
@@ -887,6 +959,7 @@ public class MainFrame extends javax.swing.JFrame {
         schedTable.clearSelection();
         editBtn.setEnabled(false);
         deleteBtn.setEnabled(false);
+        idTF.setText(null);
     }//GEN-LAST:event_deselectBtnActionPerformed
 
     private void checkInMCBPopupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent evt) {//GEN-FIRST:event_checkInMCBPopupMenuWillBecomeInvisible

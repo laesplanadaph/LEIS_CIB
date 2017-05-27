@@ -33,6 +33,12 @@ public class Reservation {
         this.checkOut = checkOut;
         this.dateAdded = dateAdded;
     }
+    
+    public Reservation (int id, String checkIn, String checkOut) {
+        this.id = id;
+        this.checkIn = checkIn;
+        this.checkOut = checkOut;
+    }
     /**
      * @return the id
      */

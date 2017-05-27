@@ -144,7 +144,7 @@ public class MainFrame extends javax.swing.JFrame {
                 checkOutMCB.getSelectedItem() != "MM" &&
                 checkOutDCB.getSelectedItem() != "DD" &&
                 checkOutYCB.getSelectedItem() != "YYYY" &&
-                validateDates() && dateConflictChecker()){
+                validateDates()){
             return true;
         } else {
             return false;
@@ -176,8 +176,8 @@ public class MainFrame extends javax.swing.JFrame {
         return result;
     }
     
-    private boolean dateConflictChecker() {
-        boolean result = true;
+    private DateConflict dateConflictChecker() {
+        DateConflict result = new DateConflict(true, true);
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
@@ -186,33 +186,43 @@ public class MainFrame extends javax.swing.JFrame {
             Date checkInDateForm = sdf.parse(checkInForm);
             Date checkOutDateForm = sdf.parse(checkOutForm);
             
-            ArrayList<Reservation> dates = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()),Integer.parseInt(idTF.getText()));
-        
-            if(dates.isEmpty()) {
+            ArrayList<Reservation> datesWithoutId = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()));
+            ArrayList<Reservation> datesWithId = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()),Integer.parseInt(idTF.getText()));
+            
+            if(datesWithoutId.isEmpty() || datesWithId.isEmpty()) {
                 return result;
             }
             
-            for (int i = 0; i < dates.size(); i++) {
-                int id = dates.get(i).getId();
-                String checkIn = dates.get(i).getCheckIn();
-                String checkOut = dates.get(i).getCheckOut();
+            for (int i = 0; i < datesWithoutId.size(); i++) {
+                int id = datesWithoutId.get(i).getId();
+                String checkIn = datesWithoutId.get(i).getCheckIn();
+                String checkOut = datesWithoutId.get(i).getCheckOut();
                 Date checkInDate = sdf.parse(checkIn);
                 Date checkOutDate = sdf.parse(checkOut);
-
-//                if (checkInDateForm.equals(checkInDate)) {
-//                    result = false;
-//                    break;
-//                }
 
                 if (checkInDateForm.compareTo(checkInDate) * checkOutDateForm.compareTo(checkOutDate) == 0 ||
                     (checkInDateForm.compareTo(checkInDate) < 0 && checkInDate.compareTo(checkOutDateForm) < 0) ||
                     (checkInDateForm.compareTo(checkInDate) > 0 && checkOutDate.compareTo(checkInDateForm) > 0)) {
                     
-                    result = false;
-                    break;
-                    
+                    result.setResultWithoutId(false);
+                    break;     
                 }
-                
+            }
+            
+            for (int i = 0; i < datesWithId.size(); i++) {
+                int id = datesWithId.get(i).getId();
+                String checkIn = datesWithId.get(i).getCheckIn();
+                String checkOut = datesWithId.get(i).getCheckOut();
+                Date checkInDate = sdf.parse(checkIn);
+                Date checkOutDate = sdf.parse(checkOut);
+
+                if (checkInDateForm.compareTo(checkInDate) * checkOutDateForm.compareTo(checkOutDate) == 0 ||
+                    (checkInDateForm.compareTo(checkInDate) < 0 && checkInDate.compareTo(checkOutDateForm) < 0) ||
+                    (checkInDateForm.compareTo(checkInDate) > 0 && checkOutDate.compareTo(checkInDateForm) > 0)) {
+                    
+                    result.setResultWithId(false);
+                    break;     
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -229,6 +239,34 @@ public class MainFrame extends javax.swing.JFrame {
         Connection conn = getConnection();
         
         String query = "SELECT reservation_id,check_in,check_out FROM reservation WHERE room='"+room+"' AND reservation_id <> '"+id+"'";
+        Statement st;
+        ResultSet rs;
+
+        try {
+            st = conn.createStatement();
+            rs = st.executeQuery(query);
+            
+            while(rs.next()) {
+                dates = new Reservation(rs.getInt("reservation_id"),rs.getString("check_in"),rs.getString("check_out"));
+                dateList.add(dates);
+            }
+            
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        return dateList;
+    }
+    
+    private ArrayList<Reservation> getDates(int room){ //reservation_id currently not used (check for what it's conflicting with)
+        Reservation dates;
+        ArrayList<Reservation> dateList = new ArrayList<Reservation>();
+        
+        
+        Connection conn = getConnection();
+        
+        String query = "SELECT reservation_id,check_in,check_out FROM reservation WHERE room='"+room+"'";
         Statement st;
         ResultSet rs;
 
@@ -348,6 +386,8 @@ public class MainFrame extends javax.swing.JFrame {
         checkOutMCB.setSelectedItem(cO[0].replaceFirst("^0+(?!$)",""));
         checkOutDCB.setSelectedItem(cO[1].replaceFirst("^0+(?!$)",""));
         checkOutYCB.setSelectedItem(cO[2]);
+        
+        addBtn.setEnabled(false);
     }
         
     private void clearForm() {
@@ -435,11 +475,22 @@ public class MainFrame extends javax.swing.JFrame {
     }
     
     private void buttonControlAddEdit() {
+        boolean add = dateConflictChecker().getResultWithoutId();
+        boolean edit = dateConflictChecker().getResultWithoutId();
+        
         if (validateForm()) {
-            addBtn.setEnabled(true);
-            if (schedTable.getSelectedRowCount() == 1){
-                editBtn.setEnabled(true);
+            if (add)
+                addBtn.setEnabled(true);
+            else
+                addBtn.setEnabled(false);
+            
+            if (schedTable.getSelectedRowCount() == 1 ){
+                if (edit)
+                    editBtn.setEnabled(true);
+                else
+                    editBtn.setEnabled(false);
             }
+
         } else {
             addBtn.setEnabled(false);
             editBtn.setEnabled(false);

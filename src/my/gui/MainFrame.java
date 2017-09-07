@@ -175,48 +175,57 @@ public class MainFrame extends javax.swing.JFrame {
         DateConflict result = new DateConflict(true, true);
         try {
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String checkInForm;
+            String checkOutForm;
+            Date checkInDateForm;
+            Date checkOutDateForm;
+            
+            if(checkInYCB.equals("YYYY") || checkOutYCB.equals("YYYY") ||  
+               checkInMCB.equals("MM") || checkOutMCB.equals("MM") ||
+               checkInMCB.equals("DD") || checkOutMCB.equals("DD")) {
+            
+                checkInForm = checkInYCB.getSelectedItem() +"-"+ checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem();
+                checkOutForm = checkOutYCB.getSelectedItem() +"-"+ checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem();
+                checkInDateForm = sdf.parse(checkInForm);
+                checkOutDateForm = sdf.parse(checkOutForm);
+            
+                ArrayList<Reservation> datesWithoutId = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()));
+                ArrayList<Reservation> datesWithId = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()),Integer.parseInt(idTF.getText()));
 
-            String checkInForm = checkInYCB.getSelectedItem() +"-"+ checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem();
-            String checkOutForm = checkOutYCB.getSelectedItem() +"-"+ checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem();
-            Date checkInDateForm = sdf.parse(checkInForm);
-            Date checkOutDateForm = sdf.parse(checkOutForm);
-            
-            ArrayList<Reservation> datesWithoutId = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()));
-            ArrayList<Reservation> datesWithId = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()),Integer.parseInt(idTF.getText()));
-            
-            if(datesWithoutId.isEmpty() || datesWithId.isEmpty()) {
-                return result;
-            }
-            
-            for (int i = 0; i < datesWithoutId.size(); i++) {
-                int id = datesWithoutId.get(i).getId();
-                String checkIn = datesWithoutId.get(i).getCheckIn();
-                String checkOut = datesWithoutId.get(i).getCheckOut();
-                Date checkInDate = sdf.parse(checkIn);
-                Date checkOutDate = sdf.parse(checkOut);
-
-                if (checkInDateForm.compareTo(checkInDate) * checkOutDateForm.compareTo(checkOutDate) == 0 ||
-                    (checkInDateForm.compareTo(checkInDate) < 0 && checkInDate.compareTo(checkOutDateForm) < 0) ||
-                    (checkInDateForm.compareTo(checkInDate) > 0 && checkOutDate.compareTo(checkInDateForm) > 0)) {
-                    
-                    result.setResultWithoutId(false);
-                    break;     
+                if(datesWithoutId.isEmpty() || datesWithId.isEmpty()) {
+                    return result;
                 }
-            }
-            
-            for (int i = 0; i < datesWithId.size(); i++) {
-                int id = datesWithId.get(i).getId();
-                String checkIn = datesWithId.get(i).getCheckIn();
-                String checkOut = datesWithId.get(i).getCheckOut();
-                Date checkInDate = sdf.parse(checkIn);
-                Date checkOutDate = sdf.parse(checkOut);
 
-                if (checkInDateForm.compareTo(checkInDate) * checkOutDateForm.compareTo(checkOutDate) == 0 ||
-                    (checkInDateForm.compareTo(checkInDate) < 0 && checkInDate.compareTo(checkOutDateForm) < 0) ||
-                    (checkInDateForm.compareTo(checkInDate) > 0 && checkOutDate.compareTo(checkInDateForm) > 0)) {
-                    
-                    result.setResultWithId(false);
-                    break;     
+                for (int i = 0; i < datesWithoutId.size(); i++) {
+                    int id = datesWithoutId.get(i).getId();
+                    String checkIn = datesWithoutId.get(i).getCheckIn();
+                    String checkOut = datesWithoutId.get(i).getCheckOut();
+                    Date checkInDate = sdf.parse(checkIn);
+                    Date checkOutDate = sdf.parse(checkOut);
+
+                    if (checkInDateForm.compareTo(checkInDate) * checkOutDateForm.compareTo(checkOutDate) == 0 ||
+                        (checkInDateForm.compareTo(checkInDate) < 0 && checkInDate.compareTo(checkOutDateForm) < 0) ||
+                        (checkInDateForm.compareTo(checkInDate) > 0 && checkOutDate.compareTo(checkInDateForm) > 0)) {
+
+                        result.setResultWithoutId(false);
+                        break;     
+                    }
+                }
+
+                for (int i = 0; i < datesWithId.size(); i++) {
+                    int id = datesWithId.get(i).getId();
+                    String checkIn = datesWithId.get(i).getCheckIn();
+                    String checkOut = datesWithId.get(i).getCheckOut();
+                    Date checkInDate = sdf.parse(checkIn);
+                    Date checkOutDate = sdf.parse(checkOut);
+
+                    if (checkInDateForm.compareTo(checkInDate) * checkOutDateForm.compareTo(checkOutDate) == 0 ||
+                        (checkInDateForm.compareTo(checkInDate) < 0 && checkInDate.compareTo(checkOutDateForm) < 0) ||
+                        (checkInDateForm.compareTo(checkInDate) > 0 && checkOutDate.compareTo(checkInDateForm) > 0)) {
+
+                        result.setResultWithId(false);
+                        break;     
+                    }
                 }
             }
         } catch (Exception e) {
@@ -351,12 +360,13 @@ public class MainFrame extends javax.swing.JFrame {
         String checkIn = checkInYCB.getSelectedItem() +"-"+ checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem();
         String checkOut = checkOutYCB.getSelectedItem() +"-"+ checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem();
         String dateTime = dateAddedFormat.format(date);
-        if (!idStr.equals("")) {
+        
+        if (!idStr.isEmpty()) {
             id = Integer.parseInt(idStr);
             reservation = new Reservation(id,name,roomNo,checkIn,checkOut,dateTime);
+        } else {
+            reservation = new Reservation(name,roomNo,checkIn,checkOut,dateTime);
         }
-        reservation = new Reservation(name,roomNo,checkIn,checkOut,dateTime);
-        
         return reservation;
     }
 
@@ -437,7 +447,7 @@ public class MainFrame extends javax.swing.JFrame {
     
     private void updateData(Reservation r){
         Connection conn = getConnection();
-
+        System.out.println("updateData Connection complete");
         String query = "UPDATE reservation "
                 +"SET name='"+r.getName() 
                 +"',room='"+r.getRoomNo() 
@@ -446,10 +456,11 @@ public class MainFrame extends javax.swing.JFrame {
                 +"' WHERE reservation_id='"+r.getId()+"'";
         Statement st;
         int rs;
-
+        System.out.println(query);
         try {
             st = conn.createStatement();
             rs = st.executeUpdate(query);
+            System.out.println("query complete");
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -943,7 +954,6 @@ public class MainFrame extends javax.swing.JFrame {
         
         if (decision == JOptionPane.YES_OPTION) {
         
-            
             updateData(getForm());
             tableModel.setRowCount(0);
             displayReservationList();

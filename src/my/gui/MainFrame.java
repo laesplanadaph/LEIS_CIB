@@ -1,20 +1,14 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package my.gui;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Date;
+import javax.swing.JComboBox;
 import javax.swing.JOptionPane;
 import javax.swing.table.DefaultTableModel;
 
@@ -23,26 +17,27 @@ import javax.swing.table.DefaultTableModel;
  * @author gene chester
  */
 public class MainFrame extends javax.swing.JFrame {
-
-    /**
-     * Creates new form LEIS
-     */
     
-    Calendar cal = Calendar.getInstance();
     DefaultTableModel tableModel;
-    
-    ArrayList<String> currentTable = new ArrayList<String>();
     
     public MainFrame() {
         initComponents();
-        
-        tableModel = (DefaultTableModel) schedTable.getModel(); 
-        
-        preloadComboBox();
-        
-        deleteBtn.setEnabled(false);
-        editBtn.setEnabled(false);
-        addBtn.setEnabled(false);
+    }
+    
+    private Connection getConnection() {
+        try {
+            Connection conn = null;
+            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/leis","root","k3k4mj33");
+            
+            if(conn != null) {
+                System.out.println("successfully connected to db!");
+            }
+            
+            return conn;
+        } catch (Exception e) {
+            System.out.println(e);
+            return null;
+        }
     }
     
     private void preloadComboBox() {
@@ -78,47 +73,60 @@ public class MainFrame extends javax.swing.JFrame {
             checkOutYCB.addItem(Integer.toString(i));
         }
         
-        
-        
     }
     
-    private void saveTable(){
+    private ArrayList<Reservation> getReservationList() {
+        
+        ArrayList<Reservation> reservationList = new ArrayList<Reservation>();
+            
+        Connection conn = getConnection();
+
+        String query = "SELECT * FROM reservation";
+        Statement st;
+        ResultSet rs;
+
         try {
-            PrintWriter writer = new PrintWriter("test.txt","UTF-8");
-            
-            for(String line : currentTable) {
-                writer.println(line);
+            st = conn.createStatement();
+            rs = st.executeQuery(query);
+
+            Reservation reservation;
+
+            while(rs.next()){
+                reservation = new Reservation(rs.getInt("reservation_id"),rs.getString("name"),rs.getInt("room"),rs.getString("check_in"),rs.getString("check_out"),rs.getString("date_added"));
+                reservationList.add(reservation);
             }
-            
-            writer.close();
-        } catch (IOException e) {
-            System.out.println(e);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
+            return reservationList;
     }
     
-    private void refreshTable(){
+    private void displayReservationList(){
         try {
+            ArrayList<Reservation> list= getReservationList();
             
-            tableModel.setRowCount(0);
+            tableModel = (DefaultTableModel) schedTable.getModel(); 
             
-            if (new File("test.txt").exists()){
+            DateFormat dateAddedFormat = new SimpleDateFormat("MM-dd-yyyy hh:mm a");
+            DateFormat checkInOutFormat = new SimpleDateFormat("MM-dd-yyyy");
+            DateFormat dateAddedParse = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            DateFormat checkInOutParse = new SimpleDateFormat("yyyy-MM-dd");
+            
+            Object[] row = new Object[6];
+            
+            for (int i = 0; i < list.size(); i++) {
+                row[0] = String.format("%06d", list.get(i).getId());
+                row[1] = list.get(i).getName();
+                row[2] = list.get(i).getRoomNo();
+                row[3] = checkInOutFormat.format(checkInOutParse.parse(list.get(i).getCheckIn()));
+                row[4] = checkInOutFormat.format(checkInOutParse.parse(list.get(i).getCheckOut()));
+                row[5] = dateAddedFormat.format(dateAddedParse.parse(list.get(i).getDateAdded()));
                 
-                BufferedReader reader = new BufferedReader(new FileReader("test.txt"));
-                boolean isCurrentTableEmpty = currentTable.isEmpty();
-                String line = null;
-                while((line = reader.readLine()) != null) {
-                    String[] split = line.split("\t");
-                    if (isCurrentTableEmpty) {
-                        currentTable.add(line);
-                    }
-                    tableModel.insertRow(tableModel.getRowCount(), new Object[]{split[0],split[1],split[2],split[3]});
-                }
-                reader.close();
-                deleteBtn.setEnabled(false);
-                editBtn.setEnabled(false);
+                tableModel.addRow(row);
             }
-        } catch (IOException e) {
-            System.out.println(e);
+
+        } catch (Exception e) {
+            e.printStackTrace();
         }  
     }
     
@@ -130,19 +138,371 @@ public class MainFrame extends javax.swing.JFrame {
                 checkInYCB.getSelectedItem() != "YYYY" &&
                 checkOutMCB.getSelectedItem() != "MM" &&
                 checkOutDCB.getSelectedItem() != "DD" &&
-                checkOutYCB.getSelectedItem() != "YYYY") {
+                checkOutYCB.getSelectedItem() != "YYYY" &&
+                validateDates()){
             return true;
         } else {
             return false;
         }
     }
     
+    private boolean validateDates() {
+        int checkInM = Integer.parseInt((String) checkInMCB.getSelectedItem());
+        int checkInD = Integer.parseInt((String) checkInDCB.getSelectedItem());
+        int checkInY = Integer.parseInt((String) checkInYCB.getSelectedItem());
+        int checkOutM = Integer.parseInt((String) checkOutMCB.getSelectedItem());
+        int checkOutD = Integer.parseInt((String) checkOutDCB.getSelectedItem());
+        int checkOutY = Integer.parseInt((String) checkOutYCB.getSelectedItem());
+        
+        boolean result = false;
 
-    /**
-     * This method is called from within the constructor to initialize the form.
-     * WARNING: Do NOT modify this code. The content of this method is always
-     * regenerated by the Form Editor.
-     */
+        if (checkOutY == checkInY){
+            if (checkOutM == checkInM) {
+                if (checkOutD > checkInD) {
+                    result = true;
+                }
+            } else if (checkOutM > checkInM) {
+                result = true;
+            }
+        } else if (checkOutY > checkInY) {
+            result = true;
+        }
+        
+        return result;
+    }
+    
+    private DateConflict dateConflictChecker() {
+        DateConflict result = new DateConflict(true, true);
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+            String checkInForm;
+            String checkOutForm;
+            Date checkInDateForm;
+            Date checkOutDateForm;
+            
+            if(checkInYCB.equals("YYYY") || checkOutYCB.equals("YYYY") ||  
+               checkInMCB.equals("MM") || checkOutMCB.equals("MM") ||
+               checkInMCB.equals("DD") || checkOutMCB.equals("DD")) {
+            
+                checkInForm = checkInYCB.getSelectedItem() +"-"+ checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem();
+                checkOutForm = checkOutYCB.getSelectedItem() +"-"+ checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem();
+                checkInDateForm = sdf.parse(checkInForm);
+                checkOutDateForm = sdf.parse(checkOutForm);
+            
+                ArrayList<Reservation> datesWithoutId = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()));
+                ArrayList<Reservation> datesWithId = getDates(Integer.parseInt(roomNoCB.getSelectedItem().toString()),Integer.parseInt(idTF.getText()));
+
+                if(datesWithoutId.isEmpty() || datesWithId.isEmpty()) {
+                    return result;
+                }
+
+                for (int i = 0; i < datesWithoutId.size(); i++) {
+                    int id = datesWithoutId.get(i).getId();
+                    String checkIn = datesWithoutId.get(i).getCheckIn();
+                    String checkOut = datesWithoutId.get(i).getCheckOut();
+                    Date checkInDate = sdf.parse(checkIn);
+                    Date checkOutDate = sdf.parse(checkOut);
+
+                    if (checkInDateForm.compareTo(checkInDate) * checkOutDateForm.compareTo(checkOutDate) == 0 ||
+                        (checkInDateForm.compareTo(checkInDate) < 0 && checkInDate.compareTo(checkOutDateForm) < 0) ||
+                        (checkInDateForm.compareTo(checkInDate) > 0 && checkOutDate.compareTo(checkInDateForm) > 0)) {
+
+                        result.setResultWithoutId(false);
+                        break;     
+                    }
+                }
+
+                for (int i = 0; i < datesWithId.size(); i++) {
+                    int id = datesWithId.get(i).getId();
+                    String checkIn = datesWithId.get(i).getCheckIn();
+                    String checkOut = datesWithId.get(i).getCheckOut();
+                    Date checkInDate = sdf.parse(checkIn);
+                    Date checkOutDate = sdf.parse(checkOut);
+
+                    if (checkInDateForm.compareTo(checkInDate) * checkOutDateForm.compareTo(checkOutDate) == 0 ||
+                        (checkInDateForm.compareTo(checkInDate) < 0 && checkInDate.compareTo(checkOutDateForm) < 0) ||
+                        (checkInDateForm.compareTo(checkInDate) > 0 && checkOutDate.compareTo(checkInDateForm) > 0)) {
+
+                        result.setResultWithId(false);
+                        break;     
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        return result;
+    }
+    
+    private ArrayList<Reservation> getDates(int room, int id){ //reservation_id currently not used (check for what it's conflicting with)
+        Reservation dates;
+        ArrayList<Reservation> dateList = new ArrayList<Reservation>();
+        
+        
+        Connection conn = getConnection();
+        
+        String query = "SELECT reservation_id,check_in,check_out FROM reservation WHERE room='"+room+"' AND reservation_id <> '"+id+"'";
+        Statement st;
+        ResultSet rs;
+
+        try {
+            st = conn.createStatement();
+            rs = st.executeQuery(query);
+            
+            while(rs.next()) {
+                dates = new Reservation(rs.getInt("reservation_id"),rs.getString("check_in"),rs.getString("check_out"));
+                dateList.add(dates);
+            }
+            
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        return dateList;
+    }
+    
+    private ArrayList<Reservation> getDates(int room){ //reservation_id currently not used (check for what it's conflicting with)
+        Reservation dates;
+        ArrayList<Reservation> dateList = new ArrayList<Reservation>();
+        
+        
+        Connection conn = getConnection();
+        
+        String query = "SELECT reservation_id,check_in,check_out FROM reservation WHERE room='"+room+"'";
+        Statement st;
+        ResultSet rs;
+
+        try {
+            st = conn.createStatement();
+            rs = st.executeQuery(query);
+            
+            while(rs.next()) {
+                dates = new Reservation(rs.getInt("reservation_id"),rs.getString("check_in"),rs.getString("check_out"));
+                dateList.add(dates);
+            }
+            
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        
+        return dateList;
+    }
+    
+    private void dateValidation(String str) {
+        String[] thirtyOne = {"MM","1","3","5","7","8","10","12"};
+        String[] thirty = {"4","6","9","11"};
+        
+        JComboBox<String> d = new JComboBox<String>();
+        JComboBox<String> m = new JComboBox<String>();
+        JComboBox<String> y = new JComboBox<String>();
+        
+        if ("in".equals(str)){
+            d = checkInDCB;
+            m = checkInMCB;
+            y = checkInYCB;            
+        } else if ("out".equals(str)){
+            d = checkOutDCB;
+            m = checkOutMCB;
+            y = checkOutYCB; 
+        }  
+        
+        Object temp = d.getSelectedItem();
+        
+        if (m.getSelectedItem().equals("2")) {
+            d.removeAllItems();
+            d.addItem("DD");
+            int feb = 29;
+            
+            if (y.getSelectedItem() != "YYYY") {
+                if ( ( (Integer.parseInt( (String) y.getSelectedItem())) % 4 ) != 0) {
+                    feb--;
+                }
+            }
+            for (int i = 1 ; i <= feb ; i++) {
+                    d.addItem(Integer.toString(i));
+            }
+        } else {
+            d.removeAllItems();
+            d.addItem("DD");
+            for (String s : thirtyOne) {
+                if (m.getSelectedItem().equals(s)){
+                    for (int i = 1 ; i <= 31 ; i++) {
+                        d.addItem(Integer.toString(i));
+                    }
+                    break;
+                }
+            }
+            for (String s : thirty) {
+                if (m.getSelectedItem().equals(s)) {
+                    for (int i = 1 ; i <= 30 ; i++) {
+                        d.addItem(Integer.toString(i));
+                    }
+                    break;
+                }
+            }
+        }
+        d.setSelectedItem(temp);
+    }
+    
+    private Reservation getForm() {
+        DateFormat dateAddedFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Date date = new Date();
+   
+        Reservation reservation;
+                
+        int id;
+        String idStr = (String) idTF.getText();
+        String name = nameTF.getText();
+        int roomNo = Integer.parseInt((String) roomNoCB.getSelectedItem());
+        String checkIn = checkInYCB.getSelectedItem() +"-"+ checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem();
+        String checkOut = checkOutYCB.getSelectedItem() +"-"+ checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem();
+        String dateTime = dateAddedFormat.format(date);
+        
+        if (!idStr.isEmpty()) {
+            id = Integer.parseInt(idStr);
+            reservation = new Reservation(id,name,roomNo,checkIn,checkOut,dateTime);
+        } else {
+            reservation = new Reservation(name,roomNo,checkIn,checkOut,dateTime);
+        }
+        return reservation;
+    }
+
+    private void setForm(int index) {
+        
+        String id = schedTable.getValueAt(index,0).toString();
+        String name = schedTable.getValueAt(index,1).toString();
+        String roomNo = schedTable.getValueAt(index,2).toString();
+        String checkIn = schedTable.getValueAt(index,3).toString();
+        String checkOut = schedTable.getValueAt(index,4).toString();
+        
+        idTF.setText(id);
+        nameTF.setText(name);
+        roomNoCB.setSelectedItem(roomNo);
+        
+        String[] cI = checkIn.split("-");
+        checkInMCB.setSelectedItem(cI[0].replaceFirst("^0+(?!$)",""));
+        checkInDCB.setSelectedItem(cI[1].replaceFirst("^0+(?!$)",""));
+        checkInYCB.setSelectedItem(cI[2]);
+        
+        String[] cO = checkOut.split("-");
+        checkOutMCB.setSelectedItem(cO[0].replaceFirst("^0+(?!$)",""));
+        checkOutDCB.setSelectedItem(cO[1].replaceFirst("^0+(?!$)",""));
+        checkOutYCB.setSelectedItem(cO[2]);
+        
+        addBtn.setEnabled(false);
+    }
+        
+    private void clearForm() {
+        nameTF.setText(null);
+        roomNoCB.setSelectedIndex(0);
+        checkInMCB.setSelectedIndex(0);
+        checkInDCB.setSelectedIndex(0);
+        checkInYCB.setSelectedIndex(0);
+        checkOutMCB.setSelectedIndex(0);
+        checkOutDCB.setSelectedIndex(0);
+        checkOutYCB.setSelectedIndex(0);
+        addBtn.setEnabled(false);
+        editBtn.setEnabled(false);
+    }
+    
+    private void insertData(Reservation r) {
+        Connection conn = getConnection();
+
+        String query = "INSERT INTO reservation (name,room,check_in,check_out,date_added) VALUES ('"+
+                r.getName() +"','"+
+                r.getRoomNo() +"','"+
+                r.getCheckIn() +"','"+
+                r.getCheckOut() +"','"+
+                r.getDateAdded() +"')";
+        Statement st;
+        int rs;
+
+        try {
+            st = conn.createStatement();
+            rs = st.executeUpdate(query);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private void deleteData(int id) {
+        Connection conn = getConnection();
+        
+        String query = "DELETE FROM reservation WHERE reservation_id='"+id+"'";
+        Statement st;
+        int rs;
+
+        try {
+            st = conn.createStatement();
+            rs = st.executeUpdate(query);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private void updateData(Reservation r){
+        Connection conn = getConnection();
+        System.out.println("updateData Connection complete");
+        String query = "UPDATE reservation "
+                +"SET name='"+r.getName() 
+                +"',room='"+r.getRoomNo() 
+                +"',check_in='"+ r.getCheckIn() 
+                +"',check_out='"+ r.getCheckOut()
+                +"' WHERE reservation_id='"+r.getId()+"'";
+        Statement st;
+        int rs;
+        System.out.println(query);
+        try {
+            st = conn.createStatement();
+            rs = st.executeUpdate(query);
+            System.out.println("query complete");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    private void buttonControlEditDelete() {
+        if  (schedTable.getSelectedRowCount() == 0) {
+            deleteBtn.setEnabled(false);
+            editBtn.setEnabled(false);
+        } else if (schedTable.getSelectedRowCount() == 1) {
+            deleteBtn.setEnabled(true);
+            editBtn.setEnabled(true);
+        } else if (schedTable.getSelectedRowCount() > 1) {
+            deleteBtn.setEnabled(true);
+            editBtn.setEnabled(false);
+        }
+    }
+    
+    private void buttonControlAddEdit() {
+        boolean add = dateConflictChecker().getResultWithoutId();
+        boolean edit = dateConflictChecker().getResultWithoutId();
+        
+        if (validateForm()) {
+            if (add)
+                addBtn.setEnabled(true);
+            else
+                addBtn.setEnabled(false);
+            
+            if (schedTable.getSelectedRowCount() == 1 ){
+                if (edit)
+                    editBtn.setEnabled(true);
+                else
+                    editBtn.setEnabled(false);
+            }
+
+        } else {
+            addBtn.setEnabled(false);
+            editBtn.setEnabled(false);
+        }
+    }
+    
     @SuppressWarnings("unchecked")
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
@@ -173,10 +533,14 @@ public class MainFrame extends javax.swing.JFrame {
         checkOutDCB = new javax.swing.JComboBox<>();
         checkInYCB = new javax.swing.JComboBox<>();
         checkOutYCB = new javax.swing.JComboBox<>();
+        idTF = new javax.swing.JTextField();
+        jLabel5 = new javax.swing.JLabel();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
-        setMinimumSize(new java.awt.Dimension(950, 380));
+        setMaximumSize(new java.awt.Dimension(1275, 500));
+        setMinimumSize(new java.awt.Dimension(1275, 500));
         setPreferredSize(new java.awt.Dimension(1023, 600));
+        setResizable(false);
         addWindowListener(new java.awt.event.WindowAdapter() {
             public void windowOpened(java.awt.event.WindowEvent evt) {
                 formWindowOpened(evt);
@@ -218,12 +582,19 @@ public class MainFrame extends javax.swing.JFrame {
 
             },
             new String [] {
-                "Name", "Room #", "Check-in Date", "Check-out Date"
+                "ID No.", "Name", "Room No.", "Check-in Date", "Check-out Date", "Date Added"
             }
         ) {
-            boolean[] canEdit = new boolean [] {
-                false, false, false, false
+            Class[] types = new Class [] {
+                java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class, java.lang.String.class
             };
+            boolean[] canEdit = new boolean [] {
+                false, false, false, false, false, false
+            };
+
+            public Class getColumnClass(int columnIndex) {
+                return types [columnIndex];
+            }
 
             public boolean isCellEditable(int rowIndex, int columnIndex) {
                 return canEdit [columnIndex];
@@ -244,14 +615,22 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
         jScrollPane1.setViewportView(schedTable);
+        if (schedTable.getColumnModel().getColumnCount() > 0) {
+            schedTable.getColumnModel().getColumn(0).setResizable(false);
+            schedTable.getColumnModel().getColumn(1).setResizable(false);
+            schedTable.getColumnModel().getColumn(2).setResizable(false);
+            schedTable.getColumnModel().getColumn(3).setResizable(false);
+            schedTable.getColumnModel().getColumn(4).setResizable(false);
+            schedTable.getColumnModel().getColumn(5).setResizable(false);
+        }
 
-        jLabel1.setText("Name");
+        jLabel1.setText("Name:");
 
-        jLabel2.setText("Room #");
+        jLabel2.setText("Room #:");
 
-        jLabel3.setText("Check-in Date");
+        jLabel3.setText("Check-in Date:");
 
-        jLabel4.setText("Check-out Date");
+        jLabel4.setText("Check-out Date:");
 
         nameTF.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyReleased(java.awt.event.KeyEvent evt) {
@@ -362,6 +741,8 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
 
+        jLabel5.setText("ID:");
+
         javax.swing.GroupLayout table_panelLayout = new javax.swing.GroupLayout(table_panel);
         table_panel.setLayout(table_panelLayout);
         table_panelLayout.setHorizontalGroup(
@@ -370,19 +751,18 @@ public class MainFrame extends javax.swing.JFrame {
                 .addContainerGap()
                 .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(table_panelLayout.createSequentialGroup()
-                        .addComponent(statusLabel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(statusLabel, javax.swing.GroupLayout.DEFAULT_SIZE, 1213, Short.MAX_VALUE)
                         .addContainerGap())
                     .addGroup(table_panelLayout.createSequentialGroup()
-                        .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 630, Short.MAX_VALUE)
-                        .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                        .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 848, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(18, 18, 18)
+                        .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                             .addGroup(table_panelLayout.createSequentialGroup()
-                                .addGap(12, 12, 12)
                                 .addComponent(deselectBtn)
                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                 .addComponent(exitBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 96, javax.swing.GroupLayout.PREFERRED_SIZE))
                             .addGroup(table_panelLayout.createSequentialGroup()
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, 34, Short.MAX_VALUE)
-                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
                                         .addComponent(jLabel1)
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -396,29 +776,35 @@ public class MainFrame extends javax.swing.JFrame {
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                                 .addComponent(clearBtn))
                                             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
-                                                .addComponent(nameTF, javax.swing.GroupLayout.PREFERRED_SIZE, 176, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                                .addGap(10, 10, 10)
-                                                .addComponent(jLabel2)
+                                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                                                    .addGroup(table_panelLayout.createSequentialGroup()
+                                                        .addComponent(nameTF, javax.swing.GroupLayout.PREFERRED_SIZE, 176, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                                        .addGap(10, 10, 10)
+                                                        .addComponent(jLabel2))
+                                                    .addComponent(jLabel5))
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                                                .addComponent(roomNoCB, javax.swing.GroupLayout.PREFERRED_SIZE, 58, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
+                                                    .addComponent(roomNoCB, 0, 58, Short.MAX_VALUE)
+                                                    .addComponent(idTF)))))
                                     .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
                                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                                             .addGroup(table_panelLayout.createSequentialGroup()
                                                 .addComponent(jLabel3)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                                                 .addComponent(checkInMCB, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                                 .addComponent(jLabel7))
                                             .addGroup(table_panelLayout.createSequentialGroup()
+                                                .addGap(0, 0, Short.MAX_VALUE)
                                                 .addComponent(jLabel4)
-                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
                                                 .addComponent(checkOutMCB, javax.swing.GroupLayout.PREFERRED_SIZE, 53, javax.swing.GroupLayout.PREFERRED_SIZE)
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                                 .addComponent(jLabel8)))
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                                            .addComponent(checkOutDCB, 0, 56, Short.MAX_VALUE)
-                                            .addComponent(checkInDCB, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                                            .addComponent(checkOutDCB, 0, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                                            .addComponent(checkInDCB, javax.swing.GroupLayout.PREFERRED_SIZE, 56, javax.swing.GroupLayout.PREFERRED_SIZE))
                                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
                                             .addGroup(table_panelLayout.createSequentialGroup()
@@ -429,7 +815,8 @@ public class MainFrame extends javax.swing.JFrame {
                                                 .addComponent(jLabel9)
                                                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                                                 .addComponent(checkInYCB, javax.swing.GroupLayout.PREFERRED_SIZE, 71, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                                        .addGap(34, 34, 34))))))))
+                                        .addGap(34, 34, 34)))
+                                .addContainerGap())))))
         );
         table_panelLayout.setVerticalGroup(
             table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -438,6 +825,10 @@ public class MainFrame extends javax.swing.JFrame {
                 .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
                     .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 382, Short.MAX_VALUE)
                     .addGroup(table_panelLayout.createSequentialGroup()
+                        .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(idTF, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabel5))
+                        .addGap(18, 18, 18)
                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                             .addComponent(nameTF, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(jLabel1)
@@ -467,20 +858,18 @@ public class MainFrame extends javax.swing.JFrame {
                                     .addComponent(checkOutYCB, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))))
                         .addGap(32, 32, 32)
                         .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(table_panelLayout.createSequentialGroup()
-                                .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                                    .addComponent(clearBtn)
-                                    .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(deleteBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(editBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
-                                        .addComponent(addBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                            .addComponent(clearBtn)
+                            .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                .addComponent(deleteBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(editBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)
+                                .addComponent(addBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 38, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addGroup(table_panelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
                                 .addComponent(statusLabel, javax.swing.GroupLayout.PREFERRED_SIZE, 18, javax.swing.GroupLayout.PREFERRED_SIZE)
                                 .addGap(29, 29, 29)
                                 .addComponent(exitBtn, javax.swing.GroupLayout.PREFERRED_SIZE, 37, javax.swing.GroupLayout.PREFERRED_SIZE))
-                            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, table_panelLayout.createSequentialGroup()
-                                .addGap(0, 0, Short.MAX_VALUE)
-                                .addComponent(deselectBtn)))))
+                            .addComponent(deselectBtn, javax.swing.GroupLayout.Alignment.TRAILING))))
                 .addContainerGap())
         );
 
@@ -510,22 +899,29 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_exitBtnActionPerformed
 
     private void addBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_addBtnActionPerformed
-        
-        String checkIn = checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem() +"-"+ checkInYCB.getSelectedItem();
-        String checkOut = checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem() +"-"+ checkOutYCB.getSelectedItem();
-        
-        currentTable.add(nameTF.getText() + "\t" + roomNoCB.getSelectedItem() + "\t" + checkIn + "\t" + checkOut);
-
-        saveTable();
-        refreshTable();
-
+        insertData(getForm());
+        tableModel.setRowCount(0);
+        displayReservationList();
+        idTF.setText(null);
     }//GEN-LAST:event_addBtnActionPerformed
 
     private void formWindowOpened(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowOpened
-        refreshTable();
+        displayReservationList();
+        preloadComboBox();
+        idTF.setEnabled(false);
+        deleteBtn.setEnabled(false);
+        editBtn.setEnabled(false);
+        addBtn.setEnabled(false);
+        schedTable.getColumnModel().getColumn(0).setPreferredWidth(10);
+        schedTable.getColumnModel().getColumn(1).setPreferredWidth(150);
+        schedTable.getColumnModel().getColumn(2).setPreferredWidth(0);
+        schedTable.getColumnModel().getColumn(3).setPreferredWidth(30);
+        schedTable.getColumnModel().getColumn(4).setPreferredWidth(30);
+        schedTable.getColumnModel().getColumn(5).setPreferredWidth(80);
     }//GEN-LAST:event_formWindowOpened
 
     private void deleteBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deleteBtnActionPerformed
+      
         int decision = JOptionPane.showConfirmDialog(null, 
                                   "All selected rows will be deleted permanently, are you sure?", 
                                   "Confirm Delete", 
@@ -535,12 +931,16 @@ public class MainFrame extends javax.swing.JFrame {
         
             int[] selectedRows = schedTable.getSelectedRows();
 
-            for (int row = selectedRows.length-1; row >= 0; row--){
-                currentTable.remove(selectedRows[row]);
+            for (int i=selectedRows.length-1 ; i >= 0 ; i--) {
+                deleteData(Integer.parseInt(tableModel.getValueAt(selectedRows[i],0).toString()));
             }
 
-            saveTable();
-            refreshTable();
+            tableModel.setRowCount(0);
+            displayReservationList();
+            
+            buttonControlAddEdit();
+            buttonControlEditDelete();
+            idTF.setText(null);
         }
         
     }//GEN-LAST:event_deleteBtnActionPerformed
@@ -554,228 +954,117 @@ public class MainFrame extends javax.swing.JFrame {
         
         if (decision == JOptionPane.YES_OPTION) {
         
-        String checkIn = checkInMCB.getSelectedItem() +"-"+ checkInDCB.getSelectedItem() +"-"+ checkInYCB.getSelectedItem();
-        String checkOut = checkOutMCB.getSelectedItem() +"-"+ checkOutDCB.getSelectedItem() +"-"+ checkOutYCB.getSelectedItem();
-        
-        currentTable.set(schedTable.getSelectedRow(), nameTF.getText() + "\t" + roomNoCB.getSelectedItem() + "\t" + checkIn + "\t" + checkOut);
-
-        saveTable();
-        refreshTable();
-        
+            updateData(getForm());
+            tableModel.setRowCount(0);
+            displayReservationList();
+            idTF.setText(null);
         }
+
         
     }//GEN-LAST:event_editBtnActionPerformed
 
     private void schedTableMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_schedTableMouseClicked
-        String rowData = currentTable.get(schedTable.getSelectedRow());
-        String[] data = rowData.split("\t");
-        
-        nameTF.setText(data[0]);
-        
-        roomNoCB.setSelectedItem(data[1]);
-        
-        String[] checkIn = data[2].split("-");
-        checkInMCB.setSelectedItem(checkIn[0]);
-        checkInDCB.setSelectedItem(checkIn[1]);
-        checkInYCB.setSelectedItem(checkIn[2]);
-
-        String[] checkOut = data[3].split("-");
-        checkOutMCB.setSelectedItem(checkOut[0]);
-        checkOutDCB.setSelectedItem(checkOut[1]);
-        checkOutYCB.setSelectedItem(checkOut[2]);
-        
-        
-//        checkInYTF.setText(data[2]);
-//        checkOutYTF.setText(data[3]);
-        
+        setForm(schedTable.getSelectedRow());
     }//GEN-LAST:event_schedTableMouseClicked
 
     private void mouseEditDeleteButtonControl(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_mouseEditDeleteButtonControl
-        if  (schedTable.getSelectedRowCount() == 0) {
-            deleteBtn.setEnabled(false);
-            editBtn.setEnabled(false);
-        } else if (schedTable.getSelectedRowCount() == 1) {
-            deleteBtn.setEnabled(true);
-            editBtn.setEnabled(true);
-        } else if (schedTable.getSelectedRowCount() > 1) {
-            deleteBtn.setEnabled(true);
-            editBtn.setEnabled(false);
-        }
+        buttonControlEditDelete();
     }//GEN-LAST:event_mouseEditDeleteButtonControl
 
     private void keyboardEditDeleteButtonControl(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_keyboardEditDeleteButtonControl
-        if  (schedTable.getSelectedRowCount() == 0) {
-            deleteBtn.setEnabled(false);
-            editBtn.setEnabled(false);
-        } else if (schedTable.getSelectedRowCount() == 1) {
-            deleteBtn.setEnabled(true);
-            editBtn.setEnabled(true);
-        } else if (schedTable.getSelectedRowCount() > 1) {
-            deleteBtn.setEnabled(true);
-            editBtn.setEnabled(false);
-        }
+        buttonControlEditDelete();
     }//GEN-LAST:event_keyboardEditDeleteButtonControl
 
     private void schedTableKeyboardReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_schedTableKeyboardReleased
-        String rowData = currentTable.get(schedTable.getSelectedRow());
-        String[] data = rowData.split("\t");
-        
-        nameTF.setText(data[0]);
-        
-        roomNoCB.setSelectedItem(data[1]);
-        
-        String[] checkIn = data[2].split("-");
-        checkInMCB.setSelectedItem(checkIn[0]);
-        checkInDCB.setSelectedItem(checkIn[1]);
-        checkInYCB.setSelectedItem(checkIn[2]);
-
-        String[] checkOut = data[3].split("-");
-        checkOutMCB.setSelectedItem(checkOut[0]);
-        checkOutDCB.setSelectedItem(checkOut[1]);
-        checkOutYCB.setSelectedItem(checkOut[2]);
+        setForm(schedTable.getSelectedRow());
+//        String rowData = currentTable.get(schedTable.getSelectedRow());
+//        String[] data = rowData.split("\t");
+//        
+//        nameTF.setText(data[0]);
+//        
+//        roomNoCB.setSelectedItem(data[1]);
+//        
+//        String[] checkIn = data[2].split("-");
+//        checkInMCB.setSelectedItem(checkIn[0]);
+//        checkInDCB.setSelectedItem(checkIn[1]);
+//        checkInYCB.setSelectedItem(checkIn[2]);
+//
+//        String[] checkOut = data[3].split("-");
+//        checkOutMCB.setSelectedItem(checkOut[0]);
+//        checkOutDCB.setSelectedItem(checkOut[1]);
+//        checkOutYCB.setSelectedItem(checkOut[2]);
     }//GEN-LAST:event_schedTableKeyboardReleased
 
     private void clearBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_clearBtnActionPerformed
-        nameTF.setText(null);
-        roomNoCB.setSelectedIndex(0);
-        checkInMCB.setSelectedIndex(0);
-        checkInDCB.setSelectedIndex(0);
-        checkInYCB.setSelectedIndex(0);
-        checkOutMCB.setSelectedIndex(0);
-        checkOutDCB.setSelectedIndex(0);
-        checkOutYCB.setSelectedIndex(0);
-        addBtn.setEnabled(false);
-        editBtn.setEnabled(false);
-        
-        
+        clearForm();
     }//GEN-LAST:event_clearBtnActionPerformed
 
     private void keyboardAddEditButtonControl(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_keyboardAddEditButtonControl
-        if (validateForm()) {
-            addBtn.setEnabled(true);
-            if (schedTable.getSelectedRowCount() == 1){
-                editBtn.setEnabled(true);
-            }
-        } else {
-            addBtn.setEnabled(false);
-            editBtn.setEnabled(false);
-        }
+        buttonControlAddEdit();
     }//GEN-LAST:event_keyboardAddEditButtonControl
 
     private void mouseAddEditButtonControl(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_mouseAddEditButtonControl
-        if (validateForm()) {
-            addBtn.setEnabled(true);
-            if (schedTable.getSelectedRowCount() == 1){
-                editBtn.setEnabled(true);
-            }
-        } else {
-            addBtn.setEnabled(false);
-            editBtn.setEnabled(false);
-        }
+        buttonControlAddEdit();
     }//GEN-LAST:event_mouseAddEditButtonControl
 
     private void popUpInvisibleAddEditButtonControl(javax.swing.event.PopupMenuEvent evt) {//GEN-FIRST:event_popUpInvisibleAddEditButtonControl
-        if (validateForm()) {
-            addBtn.setEnabled(true);
-            if (schedTable.getSelectedRowCount() == 1){
-                editBtn.setEnabled(true);
-            }
-        } else {
-            addBtn.setEnabled(false);
-            editBtn.setEnabled(false);
-        }
+        buttonControlAddEdit();
     }//GEN-LAST:event_popUpInvisibleAddEditButtonControl
 
     private void deselectBtnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_deselectBtnActionPerformed
         schedTable.clearSelection();
         editBtn.setEnabled(false);
         deleteBtn.setEnabled(false);
+        idTF.setText(null);
     }//GEN-LAST:event_deselectBtnActionPerformed
 
     private void checkInMCBPopupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent evt) {//GEN-FIRST:event_checkInMCBPopupMenuWillBecomeInvisible
-        String[] thirtyOne = {"MM","1","3","5","7","8","10","12"};
-        String[] thirty = {"4","6","9","11"};
-        
-        Object temp = checkInDCB.getSelectedItem();
-        
-        if (checkInMCB.getSelectedItem().equals("2")) {
-            checkInDCB.removeAllItems();
-            checkInDCB.addItem("DD");
-            int feb = 29;
-            
-            if (checkInYCB.getSelectedItem() != "YYYY") {
-                if ( ( (Integer.parseInt( (String) checkInYCB.getSelectedItem())) % 4 ) != 0) {
-                    feb--;
-                }
-            }
-            for (int i = 1 ; i <= feb ; i++) {
-                    checkInDCB.addItem(Integer.toString(i));
-            }
-        } else {
-            checkInDCB.removeAllItems();
-            checkInDCB.addItem("DD");
-            for (String s : thirtyOne) {
-                if (checkInMCB.getSelectedItem().equals(s)){
-                    for (int i = 1 ; i <= 31 ; i++) {
-                        checkInDCB.addItem(Integer.toString(i));
-                    }
-                    break;
-                }
-            }
-            for (String s : thirty) {
-                if (checkInMCB.getSelectedItem().equals(s)) {
-                    for (int i = 1 ; i <= 30 ; i++) {
-                        checkInDCB.addItem(Integer.toString(i));
-                    }
-                    break;
-                }
-            }
-        }
-        checkInDCB.setSelectedItem(temp);
+        dateValidation("in");
     }//GEN-LAST:event_checkInMCBPopupMenuWillBecomeInvisible
 
     private void checkOutMCBPopupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent evt) {//GEN-FIRST:event_checkOutMCBPopupMenuWillBecomeInvisible
-        String[] thirtyOne = {"MM","1","3","5","7","8","10","12"};
-        String[] thirty = {"4","6","9","11"};
-        
-        Object temp = checkOutDCB.getSelectedItem();
-        
-        if (checkOutMCB.getSelectedItem().equals("2")) {
-            checkOutDCB.removeAllItems();
-            checkOutDCB.addItem("DD");
-            int feb = 29;
-            
-            if (checkOutYCB.getSelectedItem() != "YYYY") {
-                if ( ( (Integer.parseInt( (String) checkOutYCB.getSelectedItem())) % 4 ) != 0) {
-                    feb--;
-                }
-            }
-            for (int i = 1 ; i <= feb ; i++) {
-                    checkOutDCB.addItem(Integer.toString(i));
-            }
-        } else {
-            checkOutDCB.removeAllItems();
-            checkOutDCB.addItem("DD");
-            for (String s : thirtyOne) {
-                if (checkOutMCB.getSelectedItem().equals(s)){
-                    for (int i = 1 ; i <= 31 ; i++) {
-                        checkOutDCB.addItem(Integer.toString(i));
-                    }
-                    break;
-                }
-            }
-            for (String s : thirty) {
-                if (checkOutMCB.getSelectedItem().equals(s)) {
-                    for (int i = 1 ; i <= 30 ; i++) {
-                        checkOutDCB.addItem(Integer.toString(i));
-                    }
-                    break;
-                }
-            }
-        }
-        checkOutDCB.setSelectedItem(temp);
+        dateValidation("out");
+//        String[] thirtyOne = {"MM","1","3","5","7","8","10","12"};
+//        String[] thirty = {"4","6","9","11"};
+//        
+//        Object temp = checkOutDCB.getSelectedItem();
+//        
+//        if (checkOutMCB.getSelectedItem().equals("2")) {
+//            checkOutDCB.removeAllItems();
+//            checkOutDCB.addItem("DD");
+//            int feb = 29;
+//            
+//            if (checkOutYCB.getSelectedItem() != "YYYY") {
+//                if ( ( (Integer.parseInt( (String) checkOutYCB.getSelectedItem())) % 4 ) != 0) {
+//                    feb--;
+//                }
+//            }
+//            for (int i = 1 ; i <= feb ; i++) {
+//                    checkOutDCB.addItem(Integer.toString(i));
+//            }
+//        } else {
+//            checkOutDCB.removeAllItems();
+//            checkOutDCB.addItem("DD");
+//            for (String s : thirtyOne) {
+//                if (checkOutMCB.getSelectedItem().equals(s)){
+//                    for (int i = 1 ; i <= 31 ; i++) {
+//                        checkOutDCB.addItem(Integer.toString(i));
+//                    }
+//                    break;
+//                }
+//            }
+//            for (String s : thirty) {
+//                if (checkOutMCB.getSelectedItem().equals(s)) {
+//                    for (int i = 1 ; i <= 30 ; i++) {
+//                        checkOutDCB.addItem(Integer.toString(i));
+//                    }
+//                    break;
+//                }
+//            }
+//        }
+//        checkOutDCB.setSelectedItem(temp);
     }//GEN-LAST:event_checkOutMCBPopupMenuWillBecomeInvisible
-   
+    
     /**
      * @param args the command line arguments
      */
@@ -829,11 +1118,13 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.JButton deselectBtn;
     private javax.swing.JButton editBtn;
     private javax.swing.JButton exitBtn;
+    private javax.swing.JTextField idTF;
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel10;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
     private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
     private javax.swing.JLabel jLabel7;
     private javax.swing.JLabel jLabel8;
     private javax.swing.JLabel jLabel9;
